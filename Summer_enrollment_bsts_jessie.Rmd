@@ -1,0 +1,77 @@
+---
+title: "Summer Enrollment BSTS"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(bsts)
+
+# How your variables should be specified.
+# data$n <- as.integer(data$n) #
+# data$dummy # its a dummy numeric is fine
+```
+
+# Auto-regressive model with seasonal element and regression on the two year dummy variable. 
+
+```{r}
+# Building the model of what has been.
+# XX should be replaced with the length of the data up through the end of your acutal data (most recent 2018 observation.
+m1 <- AddAr(list(), data$n[1:XX])
+m1 <- AddSeasonal(m1, data$n[1:XX], nseasons = 3) # I think 3 seasons that makes sense
+
+model1 <- bsts(data$n[1:XX]~data$sdummy[1:XX],
+               state.specification = m1, 
+               niter = 10000,
+               set.seed(1983)) # setting seed for the MCMC makes it so your values move around less if you re-run it
+```
+
+```{r, echo=F, message=F, warning=F}
+plot(model1, "comp")
+```
+
+```{r, echo=F, message=F, warning=F}
+plot(model1, "coef")
+```
+
+```{r, echo=F, message=F, warning=F}
+# Predicting the AR model
+# XX + 1 is the next observation after your original enrollment data ends (For the dummy variable).
+# YY is the end of the time frame you want to predict. 
+# ZZ is the number of period ahead you want to predict. Days from the end of the data to the date Aird wants
+pred1 <- predict(model1, newdata = as.data.frame(data$dummy[(XX)+1:YY]), horizon = ZZ, burn = 100)
+bsts::plot.bsts.prediction(pred1, plot.original = XX, main = "Model 1", ylab = "Institutional enrollment")
+``` 
+
+## Semi local-level with Seasonal element and regression on the two year dummy variable. 
+I liked this specification better for my enrollment forecast but you are free to choose which output you like better. 
+
+```{r}
+# Building the model of what has been.
+# XX should be replaced with the length of the data up through the end of your acutal data (most recent 2018 observation.
+m2 <- AddSemilocalLinearTrend(list(), data$n[1:XX])
+m2 <- AddSeasonal(m2, data$n[1:XX], nseasons = 3) # I think 3 seasons that makes sense
+
+model2 <- bsts(data$n[1:XX]~data$sdummy[1:XX],
+               state.specification = m2, 
+               niter = 10000,
+               set.seed(1983))
+```
+
+```{r, echo=F, message=F, warning=F}
+plot(model2, "comp")
+```
+
+```{r, echo=F, message=F, warning=F}
+plot(model2, "coef")
+```
+
+```{r, echo=F, message=F, warning=F}
+# Predicting the AR model
+# XX + 1 is the next observation after your original enrollment data ends (For the dummy variable).
+# YY is the end of the time frame you want to predict. 
+# ZZ is the number of period ahead you want to predict. Days from the end of the data to the date Aird wants
+pred2 <- predict(model2, newdata = as.data.frame(data$dummy[(XX)+1:YY]), horizon = ZZ, burn = 100)
+bsts::plot.bsts.prediction(pred2, plot.original = XX, main = "Model 1", ylab = "Institutional enrollment")
+``` 

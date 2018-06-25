@@ -1,0 +1,219 @@
+---
+title: "Cohort Analysis"
+author: "Jason Whittle"
+date: "5/15/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+data <- read.csv("DTC_NSC_20180514.csv")
+og_data <- read.csv("mtl_dtc.csv")
+data <- data %>% left_join(og_data, by = c("Requester.Return.Field" = "id"))
+data$tech_grad <- data$graduated
+data$ID <- data$Requester.Return.Field
+
+data <- data %>% select("First.Name", "Last.Name", "ID", 
+                        "Record.Found.Y.N", "College.Name", "X2.year...4.year", 
+                        "Public...Private", "Enrollment.Begin", "Enrollment.End", 
+                        "Enrollment.Status", "Graduated.", "Graduation.Date",
+                        "Degree.Title", "Degree.Major.1", "College.Sequence",
+                        "inst", "StartDate", "StopDate", "Birthdate", "tech_grad")
+```
+
+```{r, include=F}
+library(lubridate)
+Sys.setenv(TZ="America/Los_Angeles")
+Sys.getenv("TZ")
+data$Enrollment.Begin <- ymd(data$Enrollment.Begin)
+data$Enrollment.End <- ymd(data$Enrollment.End)
+data$Graduation.Date <- ymd(data$Graduation.Date)
+data$Birthdate <- ymd(data$Birthdate)
+data$StartDate <- ymd(data$StartDate)
+data$StopDate <- ymd(data$StopDate)
+data <- data %>% filter(College.Name != "DAVIS TECHNICAL COLLEGE") # Mountain land is not in the data. 
+```
+
+# Data summary
+
+```{r, include=F}
+data %>% group_by(inst, tech_grad) %>% summarise(n = n_distinct(ID))
+
+```
+
+
+# Cohort analysis
+
+```{r, include=F}
+data$twoyear <- data$StartDate %m+% months(24)
+data$fouryear <- data$StartDate %m+% months(48)
+data$sixyear <- data$StartDate %m+% months(72)
+```
+
+
+```{r, include=F}
+
+# all graduates
+data %>% summarise(n = n_distinct(ID)) # 2103
+data %>% filter(Graduated. == "Y") %>% summarise(n = n_distinct(ID)) # 241 (11.4%)
+data %>% filter(Graduated. == "Y") %>% filter(Graduation.Date < twoyear) %>% summarise(n = n_distinct(ID)) #138 (6.5%)
+data %>% filter(Graduated. == "Y") %>% filter(Graduation.Date < fouryear) %>% summarise(n = n_distinct(ID)) #180 (8.5%)
+data %>% filter(Graduated. == "Y") %>% filter(Graduation.Date < sixyear) %>% summarise(n = n_distinct(ID)) # 213 (10.1)
+```
+
+
+
+```{r, include=F}
+# MTL  
+data %>% filter(inst =="mtl") %>% summarise(n = n_distinct(ID)) # 436
+data %>% filter(Graduated. == "Y") %>% filter(inst =="mtl") %>% filter(Graduation.Date < twoyear) %>% summarise(n = n_distinct(ID)) # 12 (2.7%)
+data %>% filter(Graduated. == "Y") %>% filter(inst =="mtl") %>% filter(Graduation.Date < fouryear) %>% summarise(n = n_distinct(ID)) # 15 (3.4%)
+data %>% filter(Graduated. == "Y") %>% filter(inst =="mtl") %>% filter(Graduation.Date < sixyear) %>% summarise(n = n_distinct(ID)) # 19 (4.6%)
+data %>% filter(Graduated. == "Y") %>% filter(inst =="mtl") %>% summarise(n = n_distinct(ID)) # 24 (5.5%)
+```
+
+```{r}
+mtl <- c(436, 12, 15, 19, 24)
+mtl_pct <- c("-", 2.7, 3.4, 4.6, 5.5)
+mtl <- rbind(mtl, mtl_pct)
+colnames(mtl) <- c("Total", "Two year", "Four year", "Six year", "All grads")
+row.names(mtl) <- c("Students", "Percent")
+knitr::kable(mtl, caption = "Mountain Land College cohort graduations")
+```
+
+```{r, include=F}
+# DTC
+data %>% filter(inst =="dtc") %>% summarise(n = n_distinct(ID)) # 1667
+data %>% filter(Graduated. == "Y") %>% filter(inst =="dtc") %>% filter(Graduation.Date < twoyear) %>% summarise(n = n_distinct(ID)) # 126 (7.6%)
+data %>% filter(Graduated. == "Y") %>% filter(inst =="dtc") %>% filter(Graduation.Date < fouryear) %>% summarise(n = n_distinct(ID)) # 165 (9.9%)
+data %>% filter(Graduated. == "Y") %>% filter(inst =="dtc") %>% filter(Graduation.Date < sixyear) %>% summarise(n = n_distinct(ID)) # 194 (11.6%)
+data %>% filter(Graduated. == "Y") %>% filter(inst =="dtc") %>% summarise(n = n_distinct(ID)) # 217 (13%)
+```
+
+```{r}
+dtc <- c(1667, 126, 165, 194, 217)
+dtc_pct <- c("-", 7.6, 9.9, 11.6, 13)
+dtc <- rbind(dtc, dtc_pct)
+colnames(dtc) <- c("Total", "Two year", "Four year", "Six year", "All grads")
+row.names(dtc) <- c("Students", "Percent")
+knitr::kable(dtc, caption = "Davis Technical College cohort graduations")
+```
+
+# Transfer Institutions
+
+Where do students transfer after starting at either Davis Technical College or Mountainland Technical College by year. These are unique student enrollments by institutions. If a student enrolled at SLCC and also at UVU they would be counted twice.
+
+```{r, include=T}
+# dtc
+dtc_tot <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "dtc") %>% group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+dtc_2 <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "dtc") %>% filter(Enrollment.Begin < twoyear) %>%  group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n)) 
+dtc_4 <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "dtc") %>% filter(Enrollment.Begin < fouryear) %>%  group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+dtc_6 <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "dtc") %>% filter(Enrollment.Begin < sixyear) %>%  group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+
+dtc_trns <- dtc_tot %>% left_join(dtc_2, by = "College.Name") %>% left_join(dtc_4, by = "College.Name") %>% left_join(dtc_6, by = "College.Name")
+knitr::kable(dtc_trns[1:10,], 
+             col.names = c("Institution Name", "Total", "W/in 2 years", "W/in 4 years", "W/in 6 years"),
+             caption = "Transfer institition by time from stop data. Davis Tech")
+```
+
+```{r, include=T}
+#mtl
+mtl_tot <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "mtl") %>% group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+mtl_2 <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "mtl") %>% filter(Enrollment.Begin < twoyear) %>%  group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+mtl_4 <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "mtl") %>% filter(Enrollment.Begin < fouryear) %>%  group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+mtl_6 <- data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "mtl") %>% filter(Enrollment.Begin < sixyear) %>%  group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+
+mtl_trns <- mtl_tot %>% left_join(mtl_2, by = "College.Name") %>% left_join(mtl_4, by = "College.Name") %>% left_join(mtl_6, by = "College.Name")
+knitr::kable(mtl_trns[1:10,], 
+             col.names = c("Institution Name", "Total", "W/in 2 years", "W/in 4 years", "W/in 6 years"),
+             caption = "Transfer institition by time from stop data. Mountain Land Tech")
+```
+
+
+```{r}
+transfer_inst <- data %>% filter(Record.Found.Y.N == "Y") %>% 
+  filter(Enrollment.Begin < twoyear) %>%  
+  group_by(College.Name, inst) %>% 
+  summarise(n = n_distinct(ID)) %>% 
+  spread(inst, n)
+
+
+```
+
+
+```{r, include=F}
+# mtl
+data %>% filter(Record.Found.Y.N == "Y") %>% filter(inst == "mtl") %>% group_by(College.Name) %>% summarise(n = n_distinct(ID)) %>% arrange(desc(n))
+```
+
+
+
+## By year cohort graduation
+
+Completions at other higher ed. institutions following an enrollment at DTC or MTC. Years since first enrollment at DTC or MTC.
+
+```{r, include=F}
+data$cohort <- year(data$StopDate)
+
+all_student_cohort <- data %>% filter(cohort < 2020 | is.na(cohort) == T) %>% group_by(cohort, inst) %>% summarise(n = n_distinct(ID)) %>% spread(inst, n) # 2103 all students records
+data %>% filter(cohort < 2020 | is.na(cohort) == T) %>% filter(Graduated. == "Y") %>% group_by(cohort, inst) %>% summarise(n = n_distinct(ID)) %>% spread(inst, n) # 241 (11.4%)
+two_year_cohort <- data %>% filter(Graduated. == "Y") %>% filter(Graduation.Date < twoyear) %>% group_by(cohort, inst) %>% summarise(n = n_distinct(ID)) %>% spread(inst, n) #138 (6.5%)
+four_year_cohort <- data %>% filter(Graduated. == "Y") %>% filter(Graduation.Date < fouryear) %>% group_by(cohort, inst) %>% summarise(n = n_distinct(ID)) %>% spread(inst, n) #180 (8.5%)
+six_year_cohort <- data %>% filter(Graduated. == "Y") %>% filter(Graduation.Date < sixyear) %>% group_by(cohort, inst) %>% summarise(n = n_distinct(ID)) %>% spread(inst, n) # 213 (10.1)
+```
+
+```{r}
+knitr::kable(all_student_cohort, caption = "All student by cohort by institution")
+```
+
+
+```{r}
+knitr::kable(two_year_cohort, caption = "Cohort graduation at two years", col.names = c("Cohort", "Davis Tech", "Mtn. Land"))
+```
+
+```{r}
+knitr::kable(four_year_cohort, caption = "Cohort graduation at four years", col.names = c("Cohort", "Davis Tech", "Mtn. Land"))
+```
+
+```{r}
+knitr::kable(six_year_cohort, caption = "Cohort graduation at six years", col.names = c("Cohort", "Davis Tech", "Mtn. Land"))
+```
+
+\newpage
+
+# SLCC transfers and graduations
+
+```{r}
+two_year_trans <- data %>%
+  filter(College.Name == "SALT LAKE COMMUNITY COLLEGE") %>%
+  filter(StartDate <= twoyear) %>% group_by(cohort, inst) %>%
+  summarise(n = n_distinct(ID)) %>%
+  spread(inst, n) #138
+two_year_trans[is.na(two_year_trans) == T] <-0
+
+knitr::kable(two_year_trans[1:9,], 
+             caption = "Two year transfer to SLCC by cohort year.",
+             col.names = c("Cohort", "DTC", "MTL"))
+```
+
+```{r}
+six_year_cohort_slcc <- data %>% 
+  filter(Graduated. == "Y") %>%
+  filter(College.Name == "SALT LAKE COMMUNITY COLLEGE") %>% 
+  filter(Graduation.Date < sixyear) %>% 
+  group_by(cohort, inst) %>%
+  summarise(n = n_distinct(ID)) %>%
+  spread(inst, n) #138 (6.5%)
+
+knitr::kable(six_year_cohort_slcc[1:6,],
+             caption = "Six year graduations at SLCC by cohort year.",
+             col.names = c("Cohort", "DTC"))
+```
+
+

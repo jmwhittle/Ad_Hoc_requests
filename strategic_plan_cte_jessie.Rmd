@@ -1,0 +1,482 @@
+---
+title: "Strategic Plan CTE wage update"
+author: "Jason Whittle"
+date: "6/15/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(warning = F)
+knitr::opts_chunk$set(message = F)
+```
+
+```{sql, eval = F}
+select dps.MAJOR, fpgt.pidm, fpgt.term_code_graduation, fsw.quarter, fsw.wages 
+    from (select * from wsrpmgr.fact_post_grad_transfers 
+        where years_since_slcc_award = 1) fpgt
+    join wsrpmgr.dim_program_of_study dps
+        on fpgt.DIM_PROGRAM_OF_STUDY_KEY = dps.DIM_PROGRAM_OF_STUDY_KEY
+    join wsrpmgr.fact_student_wages fsw
+        on fpgt.dim_student_key = fsw.DIM_STUDENT_KEY
+    where dps.cte_ind = 'Y'
+    and fpgt.term_code_graduation in (201520, 201530, 201540)
+    and fsw.quarter in (20162, 20163, 20164, 20171, 20172, 20173, 20174);
+```
+
+```{r}
+library(tidyverse); theme_set(theme_minimal())
+data <- read_csv("cte_wages_jessie.csv")
+# 816 unique students
+```
+
+```{r}
+wide_wages <- data %>% distinct(PIDM,TERM_CODE_GRADUATION, WAGES, QUARTER) %>%
+  group_by(PIDM, QUARTER) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data %>% distinct(PIDM, TERM_CODE_GRADUATION)
+
+data <- wide_wages %>% left_join(test, by = "PIDM")
+```
+
+```{r}
+data$term <- substr(data$TERM_CODE_GRADUATION, 5, 6)
+data <- data %>% mutate(salary = if_else(term == "20", sum(`20163`, `20164`, `20171`, `20172`, na.rm = T), 
+                                 if_else(term == "30", sum(`20164`, `20171`, `20172`, `20173`, na.rm = T), 
+                                         sum(`20171`, `20172`, `20173`, `20174`, na.rm = T))))
+
+data$competitive_wage <- ifelse(data$salary > 35000, 1, 0)
+
+# data$salary <- ifelse(data$term == "20", sum(data[,3:6], na.rm = T), 
+#                       ifelse(data$term == "30", sum(data[,4:7], na.rm = T),
+#                              sum(data[,5:8], na.rm = T)))
+```
+
+```{r}
+# there are 18 extra students, these are students who recieved awards in multiple terms. -16 and -18 are an attempt to compensate for this double counting.
+round( ((sum(data$competitive_wage) - 16) / (dim(data)[1] -18) )*100, 2)
+```
+
+# Competitive Wages for Academic Years:
+Competitive wages compare Salt Lake Community College CTE grads to median earnings for 'Some college or associate's degree' estimates.\footnote{https://factfinder.census.gov/faces/tableservices/jsf/pages/productview.xhtml?src=CF}
+
+- Competitive wage for academic year 2013 is: $33,099.00 - 2014 ACS
+- Competitive wage for academic year 2014 is: $33,266.00 - 2015 ACS
+- Competitive wage for academic year 2015 is: $34,909.00 - 2016 ACS
+
+The dotted line in all of the following figures represents the 65\% threshold of students are above the competitive wage comparison. 
+
+
+```{sql, eval = F}
+select dps.MAJOR, dps.COLLEGE, fpgt.pidm, fpgt.term_code_graduation, fsw.quarter, fsw.wages 
+    from (select * from wsrpmgr.fact_post_grad_transfers 
+        where years_since_slcc_award = 1) fpgt
+    join wsrpmgr.dim_program_of_study dps
+        on fpgt.DIM_PROGRAM_OF_STUDY_KEY = dps.DIM_PROGRAM_OF_STUDY_KEY
+    join wsrpmgr.fact_student_wages fsw
+        on fpgt.dim_student_key = fsw.DIM_STUDENT_KEY
+    where dps.cte_ind = 'Y'
+    and fpgt.term_code_graduation in (201240, 201320, 201330)
+    and fsw.quarter in (20141, 20142, 20143, 20144, 20151, 20152, 20153);
+```
+
+```{r}
+data_2013 <- read.csv("cte_wages_2013.csv")
+```
+
+```{r}
+wide_wages_13 <- data_2013 %>%
+  group_by(PIDM, MAJOR, COLLEGE, QUARTER) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data_2013 %>% distinct(PIDM, TERM_CODE_GRADUATION)
+
+data_2013 <- wide_wages_13 %>% left_join(test, by = "PIDM")
+```
+
+```{r}
+data_2013 <- data_2013 %>%
+  mutate(salary = if_else(TERM_CODE_GRADUATION == 201320, sum(`20143`, `20144`, `20151`, `20152`, na.rm = T),
+                          if_else(TERM_CODE_GRADUATION == 201330, sum(`20144`, `20151`, `20152`, `20153`, na.rm = T),
+                                  sum(`20141`, `20142`, `20143`, `20144`, na.rm = T))))
+
+data_2013$competitive_wage <- ifelse(data_2013$salary > 33099, 1, 0)
+data_2013 <- data_2013 %>% select(PIDM, MAJOR, COLLEGE, TERM_CODE_GRADUATION, salary, competitive_wage)
+data_2013$a_year <- 2013
+```
+
+```{sql, eval = F}
+select dps.MAJOR, dps.COLLEGE, fpgt.pidm, fpgt.term_code_graduation, fsw.quarter, fsw.wages 
+    from (select * from wsrpmgr.fact_post_grad_transfers 
+        where years_since_slcc_award = 1) fpgt
+    join wsrpmgr.dim_program_of_study dps
+        on fpgt.DIM_PROGRAM_OF_STUDY_KEY = dps.DIM_PROGRAM_OF_STUDY_KEY
+    join wsrpmgr.fact_student_wages fsw
+        on fpgt.dim_student_key = fsw.DIM_STUDENT_KEY
+    where dps.cte_ind = 'Y'
+    and fpgt.term_code_graduation in (201340, 201420, 201430)
+    and fsw.quarter in (20151, 20152, 20153, 20154, 20161, 20162, 20163);
+```
+
+```{r}
+data_2014 <- read.csv("cte_wages_2014.csv")
+```
+
+```{r}
+wide_wages_14 <- data_2014 %>%
+  group_by(PIDM, MAJOR, COLLEGE, QUARTER) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data_2014 %>% distinct(PIDM, TERM_CODE_GRADUATION)
+
+data_2014 <- wide_wages_14 %>% left_join(test, by = "PIDM")
+```
+
+```{r}
+data_2014 <- data_2014 %>%
+  mutate(salary = if_else(TERM_CODE_GRADUATION == 201420, sum(`20153`, `20154`, `20161`, `20162`, na.rm = T),
+                          if_else(TERM_CODE_GRADUATION == 201430, sum(`20154`, `20161`, `20162`, `20163`, na.rm = T),
+                                  sum(`20151`, `20152`, `20153`, `20154`, na.rm = T))))
+
+data_2014$competitive_wage <- ifelse(data_2014$salary > 33266, 1, 0)
+data_2014 <- data_2014 %>% select(PIDM, MAJOR, COLLEGE, TERM_CODE_GRADUATION, salary, competitive_wage)
+data_2014$a_year <- 2014
+```
+
+```{sql, eval = F}
+select dps.MAJOR, dps.COLLEGE, fpgt.pidm, fpgt.term_code_graduation, fsw.quarter, fsw.wages 
+    from (select * from wsrpmgr.fact_post_grad_transfers 
+        where years_since_slcc_award = 1) fpgt
+    join wsrpmgr.dim_program_of_study dps
+        on fpgt.DIM_PROGRAM_OF_STUDY_KEY = dps.DIM_PROGRAM_OF_STUDY_KEY
+    join wsrpmgr.fact_student_wages fsw
+        on fpgt.dim_student_key = fsw.DIM_STUDENT_KEY
+    where dps.cte_ind = 'Y'
+    and fpgt.term_code_graduation in (201440, 201520, 201530)
+    and fsw.quarter in (20161, 20162, 20163, 20164, 20171, 20172, 20173);
+```
+
+```{r}
+data_2015 <- read.csv("cte_wages_2015.csv")
+```
+
+```{r}
+wide_wages_15 <- data_2015 %>%
+  group_by(PIDM, MAJOR, COLLEGE, QUARTER) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data_2015 %>% distinct(PIDM, TERM_CODE_GRADUATION)
+
+data_2015 <- wide_wages_15 %>% left_join(test, by = "PIDM")
+```
+
+```{r}
+data_2015 <- data_2015 %>%
+  mutate(salary = if_else(TERM_CODE_GRADUATION == 201520, sum(`20163`, `20164`, `20171`, `20172`, na.rm = T),
+                          if_else(TERM_CODE_GRADUATION == 201530, sum(`20164`, `20171`, `20172`, `20173`, na.rm = T),
+                                  sum(`20161`, `20162`, `20163`, `20164`, na.rm = T))))
+
+data_2015$competitive_wage <- ifelse(data_2015$salary > 34909, 1, 0)
+data_2015 <- data_2015 %>% select(PIDM, MAJOR, COLLEGE, TERM_CODE_GRADUATION, salary, competitive_wage)
+data_2015$a_year <- 2015
+```
+
+```{r}
+prog_data <- data_2013 %>% bind_rows(data_2014) %>% bind_rows(data_2015)
+```
+
+```{r, eval=FALSE}
+prog_data %>% group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>%
+  knitr::kable()
+```
+
+```{r}
+prog_data %>% group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  scale_y_discrete(limits = unique(rev(prog_data$MAJOR))) +
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+\newpage
+
+# Applied Tech &Tech Specialties
+
+```{r}
+prog_data %>% filter(COLLEGE == "Applied Tech &Tech Specialties") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  xlim(0,100)+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+\newpage
+
+```{r}
+prog_data %>% filter(COLLEGE == "Applied Tech &Tech Specialties") %>% 
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Applied Tech &Tech Specialties") %>% 
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+\newpage
+
+# Arts, Comm, & New Media
+
+```{r}
+prog_data %>% filter(COLLEGE == "Arts, Comm, & New Media") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  xlim(0,100)+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+\newpage
+
+```{r}
+prog_data %>% filter(COLLEGE == "Arts, Comm, & New Media") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Arts, Comm, & New Media") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+\newpage
+
+# Buisness
+
+```{r}
+prog_data %>% filter(COLLEGE == "Business") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none")+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+\newpage
+
+```{r}
+prog_data %>% filter(COLLEGE == "Business") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Business") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+\newpage
+
+# Health Sciences
+
+```{r}
+prog_data %>% filter(COLLEGE == "Health Sciences") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  xlim(0,100)+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Health Sciences") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Health Sciences") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+\newpage
+
+# Humanities & Social Sciences
+
+```{r}
+prog_data %>% filter(COLLEGE == "Humanities & Social Sciences") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  xlim(0,100)+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Humanities & Social Sciences") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Humanities & Social Sciences") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+\newpage
+
+# Science, Math & Engineering
+
+```{r}
+prog_data %>% filter(COLLEGE == "Science, Math & Engineering") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  xlim(0,100)+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+\newpage
+
+```{r}
+prog_data %>% filter(COLLEGE == "Science, Math & Engineering") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Science, Math & Engineering") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+\newpage
+
+# Unknown
+
+```{r}
+prog_data %>% filter(COLLEGE == "Unknown") %>%
+  group_by(MAJOR, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n())),
+            prog_n = n()) %>%
+  arrange(MAJOR) %>%
+  ggplot() + geom_point(aes(x = pct_comp_wage, y = MAJOR, col = as.factor(a_year), size=prog_n)) +  
+  scale_color_manual(values = c("#bcddf4", "#00abe1", "#003865")) + 
+  labs(col = "Academic Year") + 
+  geom_vline(xintercept = 65, linetype="dotted") + 
+  facet_grid(~a_year) + 
+  guides(size="none") + 
+  xlim(0,100)+ 
+  labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+
+```{r}
+prog_data %>% filter(COLLEGE == "Unknown") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>% 
+  knitr::kable(caption = "Percent of graduates above 'competitive' wage.")
+```
+
+```{r}
+prog_data %>% filter(COLLEGE == "Unknown") %>%
+  group_by(MAJOR, COLLEGE, a_year) %>% 
+  summarise(n_grads = n()) %>%
+  spread(a_year, n_grads) %>% 
+  knitr::kable(caption = "Number of graduates by year.")
+```
+
+```{r, eval = F}
+prog_data %>% group_by(a_year) %>% 
+  summarise(pct_comp_wage = round(100*(sum(competitive_wage)/n()))) %>%
+  spread(a_year, pct_comp_wage) %>%
+  knitr::kable()
+```
+
+

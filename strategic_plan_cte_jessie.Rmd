@@ -1,12 +1,12 @@
 ---
 title: "Strategic Plan CTE wage update"
 author: "Jason Whittle"
-date: "6/15/2018"
+date: "7/10/2018"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(warning = F)
 knitr::opts_chunk$set(message = F)
 ```
@@ -56,7 +56,7 @@ data$competitive_wage <- ifelse(data$salary > 35000, 1, 0)
 
 ```{r}
 # there are 18 extra students, these are students who recieved awards in multiple terms. -16 and -18 are an attempt to compensate for this double counting.
-round( ((sum(data$competitive_wage) - 16) / (dim(data)[1] -18) )*100, 2)
+# round( ((sum(data$competitive_wage) - 16) / (dim(data)[1] -18) )*100, 2) # this is inaccurate
 ```
 
 # Competitive Wages for Academic Years:
@@ -106,6 +106,11 @@ data_2013 <- data_2013 %>%
 data_2013$competitive_wage <- ifelse(data_2013$salary > 33099, 1, 0)
 data_2013 <- data_2013 %>% select(PIDM, MAJOR, COLLEGE, TERM_CODE_GRADUATION, salary, competitive_wage)
 data_2013$a_year <- 2013
+
+#round( ((sum(data_2013$competitive_wage)) / (dim(data_2013)[1]) )*100, 2) # 617 unique pidms
+test <- data_2013 %>% ungroup() %>% distinct(PIDM, competitive_wage)
+med_2013 <- round( ((sum(test$competitive_wage)) / (dim(test)[1]) )*100, 2)
+
 ```
 
 ```{sql, eval = F}
@@ -145,6 +150,11 @@ data_2014 <- data_2014 %>%
 data_2014$competitive_wage <- ifelse(data_2014$salary > 33266, 1, 0)
 data_2014 <- data_2014 %>% select(PIDM, MAJOR, COLLEGE, TERM_CODE_GRADUATION, salary, competitive_wage)
 data_2014$a_year <- 2014
+
+#round( ((sum(data_2014$competitive_wage)) / (dim(data_2014)[1]) )*100, 2) # 737 unique pidms
+test <- data_2014 %>% ungroup() %>% distinct(PIDM, competitive_wage)
+med_2014 <- round( ((sum(test$competitive_wage)) / (dim(test)[1]) )*100, 2)
+
 ```
 
 ```{sql, eval = F}
@@ -184,7 +194,15 @@ data_2015 <- data_2015 %>%
 data_2015$competitive_wage <- ifelse(data_2015$salary > 34909, 1, 0)
 data_2015 <- data_2015 %>% select(PIDM, MAJOR, COLLEGE, TERM_CODE_GRADUATION, salary, competitive_wage)
 data_2015$a_year <- 2015
+
+#round( ((sum(data_2015$competitive_wage)) / (dim(data_2015)[1]) )*100, 2) # 761 unique pidms
+
+test <- data_2015 %>% ungroup() %>% distinct(PIDM, competitive_wage)
+med_2015 <- round( ((sum(test$competitive_wage)) / (dim(test)[1]) )*100, 2)
 ```
+
+
+
 
 ```{r}
 prog_data <- data_2013 %>% bind_rows(data_2014) %>% bind_rows(data_2015)
@@ -210,6 +228,12 @@ prog_data %>% group_by(MAJOR, a_year) %>%
   facet_grid(~a_year) + 
   guides(size="none") + 
   labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
+```
+
+```{r}
+meds <- c(med_2013, med_2014, med_2015)
+names(meds) <- c("AY 2012-2013", "AY 2013-2014", "AY 2014-2015")
+knitr::kable(meds, col.names = c( "Percent"), caption = "Percent of all CTE grads earning above Some College/Associates median for SL County. By academic year")
 ```
 
 \newpage

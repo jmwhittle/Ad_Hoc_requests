@@ -68,6 +68,108 @@ Competitive wages compare Salt Lake Community College CTE grads to median earnin
 
 The dotted line in all of the following figures represents the 65\% threshold of students are above the competitive wage comparison. 
 
+```{sql, eval = F}
+select dps.MAJOR, dps.COLLEGE, fpgt.pidm, fpgt.term_code, fsw.quarter, fsw.wages 
+    from (select * from wsrpmgr.fact_post_grad_transfers 
+        where years_since_slcc_award = 1) fpgt
+    join wsrpmgr.dim_program_of_study dps
+        on fpgt.DIM_PROGRAM_OF_STUDY_KEY = dps.DIM_PROGRAM_OF_STUDY_KEY
+    join wsrpmgr.fact_student_wages fsw
+        on fpgt.dim_student_key = fsw.DIM_STUDENT_KEY
+    where dps.cte_ind = 'Y'
+    and fpgt.term_code in (200940, 201020, 201030, 
+                            201040, 201120, 201130, 
+                            201140, 201220, 201230)
+    and fsw.quarter in (20111, 20112, 20113, 20114,
+                        20121, 20122, 20123, 20124, 
+                        20131, 20132, 20133, 20134, 
+                        20141, 20142, 20143);
+```
+
+```{r}
+data_2010_2012 <- read.csv("cte_wages_2010_2012.csv")
+```
+
+```{r}
+#2010
+wide_wages_2010 <- data_2010_2012 %>% 
+  filter(TERM_CODE == 200940 | TERM_CODE == 201020 | TERM_CODE == 201030) %>%
+  group_by(PIDM, MAJOR, COLLEGE, QUARTER, TERM_CODE) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data_2010_2012 %>% 
+  filter(TERM_CODE == 200940 | TERM_CODE == 201020 | TERM_CODE == 201030) %>%
+  group_by(PIDM, MAJOR, COLLEGE) %>%
+  distinct(PIDM, TERM_CODE_GRADUATION)
+
+data_2010 <- wide_wages_2010 %>% left_join(test, by = "PIDM") 
+```
+
+```{r}
+data_2010 <- data_2010 %>%
+  mutate(salary = if_else(TERM_CODE== 201020, sum(`20113`, `20114`, `20121`, `20122`, na.rm = T),
+                          if_else(TERM_CODE == 201030, sum(`20114`, `20121`, `20122`, `20123`, na.rm = T),
+                                  sum(`20111`, `20112`, `20113`, `20114`, na.rm = T))))
+
+data_2010$competitive_wage <- ifelse(data_2010$salary > 32994, 1, 0)
+test <- data_2010 %>% ungroup() %>% distinct(PIDM, competitive_wage)
+med_2010 <- round( ((sum(test$competitive_wage)) / (dim(test)[1]) )*100, 2)
+```
+
+```{r}
+#2011
+wide_wages_2011 <- data_2010_2012 %>% 
+  filter(TERM_CODE == 201040 | TERM_CODE == 201120 | TERM_CODE == 201130) %>%
+  group_by(PIDM, MAJOR, COLLEGE, QUARTER, TERM_CODE) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data_2010_2012 %>% 
+  filter(TERM_CODE == 201040 | TERM_CODE == 201120 | TERM_CODE == 201130) %>%
+  group_by(PIDM, MAJOR, COLLEGE) %>%
+  distinct(PIDM, TERM_CODE_GRADUATION)
+
+data_2011 <- wide_wages_2011 %>% left_join(test, by = "PIDM") 
+```
+
+```{r}
+data_2011 <- data_2011 %>%
+  mutate(salary = if_else(TERM_CODE== 201120, sum(`20123`, `20124`, `20131`, `20132`, na.rm = T),
+                          if_else(TERM_CODE == 201130, sum(`20124`, `20131`, `20132`, `20133`, na.rm = T),
+                                  sum(`20121`, `20122`, `20123`, `20124`, na.rm = T))))
+
+data_2011$competitive_wage <- ifelse(data_2011$salary > 32748, 1, 0)
+test <- data_2011 %>% ungroup() %>% distinct(PIDM, competitive_wage)
+med_2011 <- round( ((sum(test$competitive_wage)) / (dim(test)[1]) )*100, 2)
+```
+
+```{r}
+#2012
+wide_wages_2012 <- data_2010_2012 %>% 
+  filter(TERM_CODE == 201140 | TERM_CODE == 201220 | TERM_CODE == 201230) %>%
+  group_by(PIDM, MAJOR, COLLEGE, QUARTER, TERM_CODE) %>% 
+  summarise(wage = sum(WAGES)) %>%
+  spread(QUARTER, wage)
+
+test <- data_2010_2012 %>% 
+  filter(TERM_CODE == 201140 | TERM_CODE == 201220 | TERM_CODE == 201230) %>%
+  group_by(PIDM, MAJOR, COLLEGE) %>%
+  distinct(PIDM, TERM_CODE_GRADUATION)
+
+data_2012 <- wide_wages_2012 %>% left_join(test, by = "PIDM") 
+```
+
+```{r}
+data_2012 <- data_2012 %>%
+  mutate(salary = if_else(TERM_CODE== 201220, sum(`20133`, `20134`, `20141`, `20142`, na.rm = T),
+                          if_else(TERM_CODE == 201230, sum(`20134`, `20141`, `20142`, `20143`, na.rm = T),
+                                  sum(`20131`, `20132`, `20133`, `20134`, na.rm = T))))
+
+data_2012$competitive_wage <- ifelse(data_2012$salary > 32579, 1, 0)
+test <- data_2012 %>% ungroup() %>% distinct(PIDM, competitive_wage)
+med_2012 <- round( ((sum(test$competitive_wage)) / (dim(test)[1]) )*100, 2)
+```
 
 ```{sql, eval = F}
 select dps.MAJOR, dps.COLLEGE, fpgt.pidm, fpgt.term_code_graduation, fsw.quarter, fsw.wages 
@@ -230,13 +332,20 @@ prog_data %>% group_by(MAJOR, a_year) %>%
   labs(x = "Percent of graduates above 'competitive' wage", y = "Major")
 ```
 
+\newpage
+
 ```{r}
-meds <- c(med_2013, med_2014, med_2015)
-names(meds) <- c("AY 2012-2013", "AY 2013-2014", "AY 2014-2015")
+meds <- c(med_2010, med_2011, med_2012,med_2013, med_2014, med_2015)
+names(meds) <- c("AY 2009-2010", "AY 2010-2011", "AY 2011-2012", "AY 2012-2013", "AY 2013-2014", "AY 2014-2015")
 knitr::kable(meds, col.names = c( "Percent"), caption = "Percent of all CTE grads earning above Some College/Associates median for SL County. By academic year")
 ```
 
-\newpage
+- Competitive wage for academic year 2010 is: $32,994.00 - 2011 ACS
+- Competitive wage for academic year 2011 is: $32,748.00 - 2012 ACS
+- Competitive wage for academic year 2012 is: $32,579.00 - 2013 ACS
+- Competitive wage for academic year 2013 is: $33,099.00 - 2014 ACS
+- Competitive wage for academic year 2014 is: $33,266.00 - 2015 ACS
+- Competitive wage for academic year 2015 is: $34,909.00 - 2016 ACS
 
 # Applied Tech &Tech Specialties
 
